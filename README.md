@@ -75,7 +75,7 @@ hr-resume-processor/
 
 ## 📸 Скриншоты
 ### Workflow в n8n
-![Workflow](docs/images/workflow.png)
+![Workflow](docs/images/n8n-workflow.png)
 
 ### Структура Airtable
 ![Airtable - Активные вакансии](docs/images/airtable-structure-1.png)
