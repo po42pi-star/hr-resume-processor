@@ -1,0 +1,351 @@
+{
+  "name": "HR Candidate Resume Processing and Auto-Response System",
+  "nodes": [
+    {
+      "parameters": {
+        "downloadAttachments": true,
+        "dataPropertyAttachmentsPrefixName": "resume_",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\"]"
+        }
+      },
+      "id": "5939d1e1-a0de-418b-926e-971901724343",
+      "name": "Yandex Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [-9792, 1440],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "resume_0",
+        "options": {}
+      },
+      "id": "e8781dd8-ecd7-40b6-af80-8931c47a3ce1",
+      "name": "Extract Resume Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [-9440, 1440]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.output) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Ты — матчинг-агент вакансий. Твоя задача: по данным кандидата найти подходящие вакансии из Airtable, сопоставляя должность, скиллы, опыт, тип занятости, локацию и зарплату.\n\nВАЖНО: Сначала вызови инструмент Airtable для получения списка всех вакансий, затем сравни их с данными кандидата.\n\nВходные данные:\n1. candidate_json — объект кандидата из Information Extractor\n2. vacancies — массив вакансий из Airtable\n\nЯзык и формат:\n- Отвечай на русском\n- Верни только JSON\n\nСкоринг (0-100):\n- Роль: 40 баллов\n- Скиллы: 30 баллов\n- Опыт: 10 баллов\n- Занятость: 5 баллов\n- Локация: 5 баллов\n- Зарплата: 5 баллов\n- Прочее: 5 баллов\n- Порог совпадения: 60\n\nПравила:\n- Не отбрасывай жестко — понижай балл за несовпадения\n- near_misses: 45-59\n- notable_non_matches: <45\n\nАлгоритм:\n1. Получи вакансии из Airtable\n2. Оцени каждую вакансию по критериям\n3. Посчитай score, reasons, risks\n4. Верни JSON с результатами"
+        }
+      },
+      "id": "4e21651b-3222-4d87-8817-069b64a822de",
+      "name": "HR Resume Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [-8960, 1440]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Yandex Email Trigger').item.json.to }}",
+        "toEmail": "={{ $('Yandex Email Trigger').item.json.from }}",
+        "subject": "=Re: {{ $('Yandex Email Trigger').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "=Здравствуйте! Ваша заявка была рассмотрена нашими сотрудниками и она нам понравилась. В скором времени мы с вами свяжемся для проведения интервью.",
+        "options": {}
+      },
+      "id": "a538627b-6175-42f1-aeae-fccf2b0d6286",
+      "name": "Send Response Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [-8320, 1200],
+      "webhookId": "73bb751f-10ea-483a-afd6-879a38a3fe4e"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b:free",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "70b518a4-98f4-49a3-997a-7e982d7f623a",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [-9008, 1664]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "attributes": {
+          "attributes": [
+            { "name": "full_name", "description": "Фамилия, имя, отчество кандидата", "required": true },
+            { "name": "birth_date", "description": "дата рождения в формате YYYY-MM-DD", "required": true },
+            { "name": "sex", "description": "пол кандидата (муж/жен)" },
+            { "name": "country", "description": "страна проживания", "required": true },
+            { "name": "city", "description": "город проживания", "required": true },
+            { "name": "citizenship", "description": "гражданство", "required": true },
+            { "name": "position", "description": "желаемая должность", "required": true },
+            { "name": "employment", "description": "желаемая занятость (например, полная занятость)", "required": true },
+            { "name": "experience", "type": "number", "description": "опыт работы в годах", "required": true },
+            { "name": "skills", "description": "массив навыков и технологий", "required": true },
+            { "name": "salary", "type": "number", "description": "желаемая зарплата", "required": true },
+            { "name": "contact_phone", "description": "контактный номер телефона", "required": true },
+            { "name": "email", "description": "электронная почта", "required": true }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [-9296, 1440],
+      "id": "7df39901-e6f7-4897-99a5-ea5b9cedbb39",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b:free",
+        "options": { "temperature": 0.3 }
+      },
+      "id": "50b17cd2-02b9-4dcd-971d-88d99907a4f6",
+      "name": "OpenRouter Chat Model for Extractor",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [-9232, 1664]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Получить все вакансии из базы данных Airtable для сравнения с кандидатом. Вызови этот инструмент ПЕРВЫМ, чтобы получить список всех доступных вакансий.",
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appbCumdUxsmEvhRg",
+          "mode": "list",
+          "cachedResultName": "HR",
+          "cachedResultUrl": "https://airtable.com/appbCumdUxsmEvhRg"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblRH5fiNL4C9ragx",
+          "mode": "list",
+          "cachedResultName": "Активные вакансии",
+          "cachedResultUrl": "https://airtable.com/appbCumdUxsmEvhRg/tblRH5fiNL4C9ragx"
+        },
+        "returnAll": false,
+        "limit": 20,
+        "options": {}
+      },
+      "id": "2e4b677e-0b33-44e2-9431-c0bcc32515c4",
+      "name": "Airtable Tool",
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.1,
+      "position": [-8880, 1664]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"candidate\": {\"type\": \"object\", \"properties\": {\"full_name\": {\"type\": \"string\"}, \"birth_date\": {\"type\": \"string\"}, \"sex\": {\"type\": \"string\"}, \"country\": {\"type\": \"string\"}, \"city\": {\"type\": \"string\"}, \"citizenship\": {\"type\": \"string\"}, \"position\": {\"type\": \"string\"}, \"employment\": {\"type\": \"string\"}, \"experience\": {\"type\": \"number\"}, \"skills\": {\"type\": \"string\"}, \"salary\": {\"type\": \"number\"}, \"contact_phone\": {\"type\": \"string\"}, \"email\": {\"type\": \"string\"}}}, \"matches\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"title\": {\"type\": \"string\"}, \"description\": {\"type\": \"string\"}, \"score\": {\"type\": \"number\"}, \"reasons\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}, \"risks\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}}}}, \"overall_score\": {\"type\": \"number\"}, \"reasons\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}, \"risks\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}}}}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [-8752, 1664],
+      "id": "b0309dcb-6f93-4033-863e-c8eb8405d72d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appbCumdUxsmEvhRg",
+          "mode": "list",
+          "cachedResultName": "HR",
+          "cachedResultUrl": "https://airtable.com/appbCumdUxsmEvhRg"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblfAGWKAXjMClE5G",
+          "mode": "list",
+          "cachedResultName": "Кандидаты",
+          "cachedResultUrl": "https://airtable.com/appbCumdUxsmEvhRg/tblfAGWKAXjMClE5G"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ФИО кандидата": "={{ $json.output.candidate.full_name }}",
+            "Позиция": "={{ $json.output.candidate.position }}",
+            "Навыки": "={{ $json.output.candidate.skills }}",
+            "Опыт": "={{ $json.output.candidate.experience }}",
+            "Страна": "={{ $json.output.candidate.country }}",
+            "Город": "={{ $json.output.candidate.city }}",
+            "Зарплата": "={{ $json.output.candidate.salary }}",
+            "Результат (matching)": "={{ JSON.stringify($json.output.matches) }}",
+            "Телефон и e-mail": "={{ $json.output.candidate.contact_phone }}, {{ $json.output.candidate.email }}",
+            "Общий балл": "={{ $json.output.overall_score }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "ФИО кандидата", "displayName": "ФИО кандидата", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Позиция", "displayName": "Позиция", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Навыки", "displayName": "Навыки", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Опыт", "displayName": "Опыт", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "Город", "displayName": "Город", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Страна", "displayName": "Страна", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Зарплата", "displayName": "Зарплата", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "number", "readOnly": false, "removed": false },
+            { "id": "Результат (matching)", "displayName": "Результат (matching)", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Общий балл", "displayName": "Общий балл", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false },
+            { "id": "Телефон и e-mail", "displayName": "Телефон и e-mail", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "display": true, "type": "string", "readOnly": false, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d426612b-76d9-413d-984a-8c1275ef8bca",
+      "name": "Store Candidate Data",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [-8560, 1648]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "73affc4b-273c-47bb-89df-a6b72381d0e5",
+              "leftValue": "={{ $json.output.overall_score }}",
+              "rightValue": 60,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-8560, 1280],
+      "id": "951aa146-0fd7-45cc-867f-3d0b0c4812a1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Yandex Email Trigger').item.json.to }}",
+        "toEmail": "={{ $('Yandex Email Trigger').item.json.from }}",
+        "subject": "=Re: {{ $('Yandex Email Trigger').item.json.subject }}",
+        "emailFormat": "text",
+        "text": "=Здравствуйте! К сожалению, мы вынуждены вам отказать, так как у нас нет подходящих для вас вакансий на данный момент.",
+        "options": {}
+      },
+      "id": "1fbb130a-72db-474d-92f8-ff09762d7bc7",
+      "name": "Send Response Email1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [-8320, 1376],
+      "webhookId": "73bb751f-10ea-483a-afd6-879a38a3fe4e"
+    },
+    {
+      "parameters": {
+        "content": "## Получение сообщения из почты",
+        "height": 672,
+        "width": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-9840, 1152],
+      "id": "b7a3a7d4-0d3a-485d-b500-e2e1122b128f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Подготовка данных",
+        "height": 672,
+        "width": 576
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-9632, 1152],
+      "id": "c5c15226-8ca6-4858-86d5-e4c8f7a5ffb9",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Анализ и сопоставление резюме и таблицы вакансий",
+        "height": 672,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-9040, 1152],
+      "id": "25d7bb1f-3579-4c7c-9caf-441a165ced72",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Сохранение информации о кандидате",
+        "height": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-8608, 1536],
+      "id": "f522e249-fea1-4ae6-8e8c-e72805dfe800",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Прием решения о приеме или отказе",
+        "height": 368,
+        "width": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-8608, 1152],
+      "id": "b9b294bd-f6aa-433d-8384-96a48f16cc72",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "id-1", "name": "responseTemplate", "value": "Здравствуйте! Спасибо за ваше резюме. Мы рассмотрим вашу кандидатуру и свяжемся с вами в ближайшее время.", "type": "string" },
+            { "id": "id-2", "name": "dbTable", "value": "candidates", "type": "string" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "0d2f79db-9a4e-463a-8fc0-c0ac68a4e9b6",
+      "name": "Workflow Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-9584, 1440]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Yandex Email Trigger": { "main": [[{ "node": "Workflow Config", "type": "main", "index": 0 }]] },
+    "Extract Resume Text": { "main": [[{ "node": "Information Extractor", "type": "main", "index": 0 }]] },
+    "HR Resume Analyzer": { "main": [[{ "node": "Store Candidate Data", "type": "main", "index": 0 }, { "node": "If", "type": "main", "index": 0 }]] },
+    "OpenRouter Chat Model": { "ai_languageModel": [[{ "node": "HR Resume Analyzer", "type": "ai_languageModel", "index": 0 }]] },
+    "Information Extractor": { "main": [[{ "node": "HR Resume Analyzer", "type": "main", "index": 0 }]] },
+    "OpenRouter Chat Model for Extractor": { "ai_languageModel": [[{ "node": "Information Extractor", "type": "ai_languageModel", "index": 0 }]] },
+    "Airtable Tool": { "ai_tool": [[{ "node": "HR Resume Analyzer", "type": "ai_tool", "index": 0 }]] },
+    "Structured Output Parser": { "ai_outputParser": [[{ "node": "HR Resume Analyzer", "type": "ai_outputParser", "index": 0 }]] },
+    "Store Candidate Data": { "main": [[]] },
+    "If": { "main": [[{ "node": "Send Response Email", "type": "main", "index": 0 }], [{ "node": "Send Response Email1", "type": "main", "index": 0 }]] },
+    "Workflow Config": { "main": [[{ "node": "Extract Resume Text", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "ebcdece9-96cb-4173-b5fa-0e51e34f246c",
+  "meta": { "instanceId": "c6487de88c455428d819be23f1f0bf3e7d7a58248882c41d5562b7c2c92ec1cf" },
+  "id": "wByxLlvc2GGaOl7y",
+  "tags": []
+}
